@@ -3982,10 +3982,13 @@ function Invoke-AllChecks {
         "`n"
     }
     catch { echo "Unable to process" }
-
-    if($HTMLReport) {
-        "[*] Report written to '$HtmlReportFile' `n"
+    
+    try {
+        if($HTMLReport) {
+            "[*] Report written to '$HtmlReportFile' `n"
+        }
     }
+    catch { echo "Unable to process" }
     echo "Complete"
 }
 
