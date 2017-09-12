@@ -3803,143 +3803,185 @@ function Invoke-AllChecks {
     # initial admin checks
 
     "`n[*] Running Invoke-AllChecks"
+    try {
+        $IsAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
 
-    $IsAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")
-
-    if($IsAdmin){
-        "[+] Current user already has local administrative privileges!"
-
-        if($HTMLReport) {
-            ConvertTo-HTML -Head $Header -Body "<H2>User Has Local Admin Privileges!</H2>" | Out-File -Append $HtmlReportFile
-        }
-    }
-    else{
-        "`n`n[*] Checking if user is in a local group with administrative privileges..."
-
-        $CurrentUserSids = Get-CurrentUserTokenGroupSid | Select-Object -ExpandProperty SID
-        if($CurrentUserSids -contains 'S-1-5-32-544') {
-            "[+] User is in a local group that grants administrative privileges!"
-            "[+] Run a BypassUAC attack to elevate privileges to admin."
+        if($IsAdmin){
+            "[+] Current user already has local administrative privileges!"
 
             if($HTMLReport) {
-                ConvertTo-HTML -Head $Header -Body "<H2> User In Local Group With Administrative Privileges</H2>" | Out-File -Append $HtmlReportFile
+                ConvertTo-HTML -Head $Header -Body "<H2>User Has Local Admin Privileges!</H2>" | Out-File -Append $HtmlReportFile
+            }
+        }
+        else{
+            "`n`n[*] Checking if user is in a local group with administrative privileges..."
+
+            $CurrentUserSids = Get-CurrentUserTokenGroupSid | Select-Object -ExpandProperty SID
+            if($CurrentUserSids -contains 'S-1-5-32-544') {
+                "[+] User is in a local group that grants administrative privileges!"
+                "[+] Run a BypassUAC attack to elevate privileges to admin."
+
+                if($HTMLReport) {
+                    ConvertTo-HTML -Head $Header -Body "<H2> User In Local Group With Administrative Privileges</H2>" | Out-File -Append $HtmlReportFile
+                }
             }
         }
     }
+    catch { echo "Unable to process" }
 
 
     # Service checks
 
     "`n`n[*] Checking for unquoted service paths..."
-    $Results = Get-ServiceUnquoted
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Unquoted Service Paths</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-ServiceUnquoted
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Unquoted Service Paths</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
     "`n`n[*] Checking service executable and argument permissions..."
-    $Results = Get-ModifiableServiceFile
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Service File Permissions</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-ModifiableServiceFile
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Service File Permissions</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
     "`n`n[*] Checking service permissions..."
-    $Results = Get-ModifiableService
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Modifiable Services</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-ModifiableService
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Modifiable Services</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
 
     # DLL hijacking
 
     "`n`n[*] Checking %PATH% for potentially hijackable DLL locations..."
-    $Results = Find-PathDLLHijack
-    $Results | Where-Object {$_} | Foreach-Object {
-        $AbuseString = "Write-HijackDll -DllPath '$($_.ModifiablePath)\wlbsctrl.dll'"
-        $_ | Add-Member Noteproperty 'AbuseFunction' $AbuseString
-        $_
-    } | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>%PATH% .dll Hijacks</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Find-PathDLLHijack
+        $Results | Where-Object {$_} | Foreach-Object {
+            $AbuseString = "Write-HijackDll -DllPath '$($_.ModifiablePath)\wlbsctrl.dll'"
+            $_ | Add-Member Noteproperty 'AbuseFunction' $AbuseString
+            $_
+        } | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>%PATH% .dll Hijacks</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
 
     # registry checks
 
     "`n`n[*] Checking for AlwaysInstallElevated registry key..."
-    if (Get-RegistryAlwaysInstallElevated) {
-        $Out = New-Object PSObject
-        $Out | Add-Member Noteproperty 'AbuseFunction' "Write-UserAddMSI"
-        $Results = $Out
+    try {
+        if (Get-RegistryAlwaysInstallElevated) {
+            $Out = New-Object PSObject
+            $Out | Add-Member Noteproperty 'AbuseFunction' "Write-UserAddMSI"
+            $Results = $Out
 
-        $Results | Format-List
-        if($HTMLReport) {
-            $Results | ConvertTo-HTML -Head $Header -Body "<H2>AlwaysInstallElevated</H2>" | Out-File -Append $HtmlReportFile
+            $Results | Format-List
+            if($HTMLReport) {
+                $Results | ConvertTo-HTML -Head $Header -Body "<H2>AlwaysInstallElevated</H2>" | Out-File -Append $HtmlReportFile
+            }
         }
     }
+    catch { echo "Unable to process" }
 
     "`n`n[*] Checking for Autologon credentials in registry..."
-    $Results = Get-RegistryAutoLogon
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Registry Autologons</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-RegistryAutoLogon
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Registry Autologons</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
 
     "`n`n[*] Checking for modifidable registry autoruns and configs..."
-    $Results = Get-ModifiableRegistryAutoRun
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Registry Autoruns</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-ModifiableRegistryAutoRun
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Registry Autoruns</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
     # other checks
 
     "`n`n[*] Checking for modifiable schtask files/configs..."
-    $Results = Get-ModifiableScheduledTaskFile
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Modifidable Schask Files</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-ModifiableScheduledTaskFile
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Modifidable Schask Files</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
     "`n`n[*] Checking for unattended install files..."
-    $Results = Get-UnattendedInstallFile
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Unattended Install Files</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-UnattendedInstallFile
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Unattended Install Files</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
     "`n`n[*] Checking for encrypted web.config strings..."
-    $Results = Get-Webconfig | Where-Object {$_}
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Encrypted 'web.config' String</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-Webconfig | Where-Object {$_}
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Encrypted 'web.config' String</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
     "`n`n[*] Checking for encrypted application pool and virtual directory passwords..."
-    $Results = Get-ApplicationHost | Where-Object {$_}
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Encrypted Application Pool Passwords</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-ApplicationHost | Where-Object {$_}
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Encrypted Application Pool Passwords</H2>" | Out-File -Append $HtmlReportFile
+        }
     }
+    catch { echo "Unable to process" }
 
     "`n`n[*] Checking for plaintext passwords in McAfee SiteList.xml files...."
-    $Results = Get-SiteListPassword | Where-Object {$_}
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>McAfee's SiteList.xml's</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-SiteListPassword | Where-Object {$_}
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>McAfee's SiteList.xml's</H2>" | Out-File -Append $HtmlReportFile
+        }
+        "`n"
     }
+    catch { echo "Unable to process" }
     "`n"
-
+    
     "`n`n[*] Checking for cached Group Policy Preferences .xml files...."
-    $Results = Get-CachedGPPPassword | Where-Object {$_}
-    $Results | Format-List
-    if($HTMLReport) {
-        $Results | ConvertTo-HTML -Head $Header -Body "<H2>Cached GPP Files</H2>" | Out-File -Append $HtmlReportFile
+    try {
+        $Results = Get-CachedGPPPassword | Where-Object {$_}
+        $Results | Format-List
+        if($HTMLReport) {
+            $Results | ConvertTo-HTML -Head $Header -Body "<H2>Cached GPP Files</H2>" | Out-File -Append $HtmlReportFile
+        }
+        "`n"
     }
-    "`n"
+    catch { echo "Unable to process" }
 
     if($HTMLReport) {
         "[*] Report written to '$HtmlReportFile' `n"
