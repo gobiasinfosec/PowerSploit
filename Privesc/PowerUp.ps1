@@ -3986,6 +3986,7 @@ function Invoke-AllChecks {
     if($HTMLReport) {
         "[*] Report written to '$HtmlReportFile' `n"
     }
+    echo "Complete"
 }
 
 
